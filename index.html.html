@@ -1,0 +1,1155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WWI Battle Map</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    
+    <style>
+        /* Import IM Fell English font */
+        @import url('https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&display=swap');
+
+        /* Apply font to body and all elements */
+        body {
+            background: url('./images/wood-texture.jpg');
+            background-size: cover;
+            font-family: 'IM Fell English', serif;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        #map {
+            height: 80vh;
+            width: 100%;
+            margin: 0 auto;
+            border: 12px solid;
+            border-image: url('https://raw.githubusercontent.com/Ravanger/assets/main/wood_texture.png') 30 stretch;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.4);
+            position: relative;
+            z-index: 1;
+        }
+        
+        .map-container {
+            position: relative;
+            padding: 40px;
+            background: transparent;  /* Completely transparent */
+            border-radius: 8px;
+            box-shadow: 
+                inset 0 0 50px rgba(0,0,0,0.2),  /* Lighter shadow */
+                0 10px 20px rgba(0,0,0,0.2);
+        }
+
+        .input-container {
+            text-align: center;
+            padding: 20px;
+            background: transparent;  /* Completely transparent */
+            margin-bottom: 20px;
+            position: relative;
+            z-index: 2;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);  /* Subtle shadow */
+            border-radius: 4px;
+        }
+        
+        .autocomplete-container {
+            position: relative;
+            width: 800px;  /* Increased from 500px to 800px */
+            margin: 0 auto;
+        }
+
+        #country-input {
+            padding: 20px 25px;
+            width: 100%;
+            font-size: 24px;
+            font-family: 'IM Fell English', serif;
+            border: 3px solid #4a3c2d;
+            background-color: #f5eee1;
+            color: #2c2416;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
+            box-sizing: border-box;  /* Added to include padding in width calculation */
+        }
+
+        .dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            width: 100%;  /* Match container width exactly */
+            background: #f5eee1;
+            border: 2px solid #4a3c2d;
+            border-top: none;
+            border-radius: 0 0 4px 4px;
+            max-height: 300px;
+            overflow-y: auto;
+            display: none;
+            z-index: 1000;
+            font-size: 20px;
+            box-sizing: border-box;  /* Added to include padding in width calculation */
+        }
+
+        .dropdown-item {
+            padding: 10px 25px;  /* Match the input padding */
+            cursor: pointer;
+            font-family: 'IM Fell English', serif;
+        }
+
+        .dropdown-item:hover {
+            background-color: #4a3c2d;
+            color: #f5eee1;
+        }
+
+        .leaflet-popup-content-wrapper {
+            background-color: #f5eee1 !important;
+            border: 2px solid #4a3c2d;
+            width: 800px !important;  /* Doubled from 400px to 800px */
+        }
+
+        .leaflet-popup-content {
+            margin: 30px !important;  /* Increased margin */
+            width: auto !important;
+            font-size: 20px !important;  /* Increased base font size */
+            font-family: 'IM Fell English', serif;
+        }
+
+        .leaflet-popup-tip {
+            background-color: #4a3c2d !important;
+        }
+
+        .battle-popup h3 {
+            margin: 0 0 15px 0;  /* More margin below title */
+            color: #4a3c2d;
+            font-family: 'IM Fell English', serif;
+            font-size: 32px;  /* Larger title */
+            font-weight: bold;
+        }
+
+        .battle-popup p {
+            margin: 15px 0;  /* More spacing between lines */
+            color: #2c2416;
+            font-family: 'IM Fell English', serif;
+            font-size: 24px;  /* Larger text */
+            line-height: 1.5;  /* Increased line spacing */
+        }
+
+        .battle-popup a {
+            color: #6b4423;
+            text-decoration: underline;
+            font-size: 24px;  /* Matched to paragraph size */
+        }
+
+        .explosion-icon {
+            font-size: 24px;
+            white-space: nowrap;
+            background: none;
+            border: none;
+            text-align: left;
+        }
+
+        /* Scale based on zoom level */
+        .leaflet-zoom-animated {
+            transition: transform 0.25s;
+        }
+
+        /* Make icons larger at higher zoom levels */
+        .leaflet-marker-icon {
+            transform-origin: center;
+            transition: transform 0.2s;
+        }
+        
+        .leaflet-zoom-6 .leaflet-marker-icon { transform: scale(1.2); }
+        .leaflet-zoom-7 .leaflet-marker-icon { transform: scale(1.4); }
+        .leaflet-zoom-8 .leaflet-marker-icon { transform: scale(1.6); }
+        .leaflet-zoom-9 .leaflet-marker-icon { transform: scale(1.8); }
+        .leaflet-zoom-10 .leaflet-marker-icon { transform: scale(2); }
+
+        .battle-image {
+            margin: 15px 0;
+            text-align: center;
+        }
+
+        .battle-image img {
+            max-width: 100%;
+            height: auto;
+            border: 2px solid #4a3c2d;
+            border-radius: 4px;
+        }
+
+        .image-caption {
+            font-size: 18px;
+            color: #666;
+            margin-top: 8px;
+            font-style: italic;
+        }
+
+        .search-container {
+            font-family: 'IM Fell English', serif;
+        }
+
+        #countryInput {
+            font-family: 'IM Fell English', serif;
+        }
+
+        .leaflet-container {
+            font-family: 'IM Fell English', serif !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="input-container">
+        <div class="autocomplete-container">
+            <input type="text" id="country-input" placeholder="Enter a country name...">
+            <div class="dropdown" id="country-dropdown"></div>
+        </div>
+    </div>
+    <div class="map-container">
+        <div id="map"></div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <script>
+        // Define battles data first
+        const battles = {
+            'belgium': {
+                'mons': {
+                    name: 'Battle of Mons',
+                    coordinates: [50.4542, 3.9567],
+                    date: 'Aug 23, 1914',
+                    casualties: '6,000+',
+                    participants: ['GBR', 'GER'],
+                    wiki: 'https://en.wikipedia.org/wiki/Battle_of_Mons'
+                },
+                'liege': {
+                    name: 'Battle of Liège',
+                    coordinates: [50.6452, 5.5734],
+                    date: 'Aug 5–16, 1914',
+                    casualties: '20,000+',
+                    participants: ['GER', 'BEL'],
+                    wiki: 'https://en.wikipedia.org/wiki/Battle_of_Li%C3%A8ge'
+                },
+                'first_ypres': {
+                    name: 'First Battle of Ypres',
+                    coordinates: [50.8527, 2.8855],
+                    date: 'Oct 19 – Nov 22, 1914',
+                    casualties: '250,000+',
+                    participants: ['GER', 'GBR', 'FRA', 'BEL'],
+                    wiki: 'https://en.wikipedia.org/wiki/First_Battle_of_Ypres'
+                },
+                'second_ypres': {
+                    name: 'Second Battle of Ypres',
+                    coordinates: [50.8870, 2.9571],
+                    date: 'Apr 22 – May 25, 1915',
+                    casualties: '100,000+',
+                    participants: ['GER', 'GBR'],
+                    wiki: 'https://en.wikipedia.org/wiki/Second_Battle_of_Ypres'
+                },
+                'passchendaele': {
+                    name: 'Battle of Passchendaele',
+                    coordinates: [50.9000, 2.9833],
+                    date: 'Jul 31 – Nov 10, 1917',
+                    casualties: '600,000+',
+                    participants: ['GER', 'GBR', 'FRA'],
+                    wiki: 'https://en.wikipedia.org/wiki/Battle_of_Passchendaele'
+                }
+            },
+            'serbia': {
+                'cer': {
+                    name: 'Battle of Cer',
+                    coordinates: [44.5700, 19.5000],
+                    date: 'Aug 15–24, 1914',
+                    casualties: '30,000+',
+                    participants: ['SRB', 'AUS'],
+                    wiki: 'https://en.wikipedia.org/wiki/Battle_of_Cer'
+                },
+                'kolubara': {
+                    name: 'Battle of Kolubara',
+                    coordinates: [44.3333, 20.5000],
+                    date: 'Nov 16 – Dec 16, 1914',
+                    casualties: '130,000+',
+                    participants: ['SRB', 'AUS'],
+                    wiki: 'https://en.wikipedia.org/wiki/Battle_of_Kolubara'
+                },
+                'drina': {
+                    name: 'Battle of the Drina',
+                    coordinates: [44.3833, 19.1167],
+                    date: 'Sep 6 – Oct 4, 1914',
+                    casualties: '100,000+',
+                    participants: ['SRB', 'AUS'],
+                    wiki: 'https://en.wikipedia.org/wiki/Battle_of_Drina'
+                }
+            },
+            'france': {
+                'marne': {
+                    name: 'First Battle of the Marne',
+                    coordinates: [49.0481, 3.4009],
+                    date: 'Sep 5–12, 1914',
+                    casualties: '500,000+',
+                    participants: ['FRA', 'GBR', 'GER'],
+                    wiki: 'https://en.wikipedia.org/wiki/First_Battle_of_the_Marne'
+                },
+                'verdun': {
+                    name: 'Battle of Verdun',
+                    coordinates: [49.1586, 5.3821],
+                    date: 'Feb 21 – Dec 18, 1916',
+                    casualties: '700,000+',
+                    participants: ['FRA', 'GER'],
+                    wiki: 'https://en.wikipedia.org/wiki/Battle_of_Verdun'
+                },
+                'somme': {
+                    name: 'Battle of the Somme',
+                    coordinates: [50.0200, 2.6500],
+                    date: 'Jul 1 – Nov 18, 1916',
+                    casualties: '1,000,000+',
+                    participants: ['GBR', 'FRA', 'GER'],
+                    wiki: 'https://en.wikipedia.org/wiki/Battle_of_the_Somme'
+                },
+                'cambrai': {
+                    name: 'Battle of Cambrai',
+                    coordinates: [50.1755, 3.2354],
+                    date: 'Nov 20 – Dec 7, 1917',
+                    casualties: '90,000+',
+                    participants: ['GBR', 'GER'],
+                    wiki: 'https://en.wikipedia.org/wiki/Battle_of_Cambrai_(1917)'
+                },
+                'amiens': {
+                    name: 'Battle of Amiens',
+                    coordinates: [49.8941, 2.2958],
+                    date: 'Aug 8–12, 1918',
+                    casualties: '100,000+',
+                    participants: ['GBR', 'FRA', 'USA', 'GER'],
+                    wiki: 'https://en.wikipedia.org/wiki/Battle_of_Amiens_(1918)'
+                },
+                'frontiers': {
+                    name: 'Battles of the Frontiers',
+                    coordinates: [49.6500, 5.9333],
+                    date: 'Aug 7–23, 1914',
+                    casualties: '300,000+',
+                    participants: ['FRA', 'GER'],
+                    wiki: 'https://en.wikipedia.org/wiki/Battle_of_the_Frontiers'
+                },
+                'arras': {
+                    name: 'Battle of Arras (1917)',
+                    coordinates: [50.2910, 2.7775],
+                    date: 'Apr 9 – May 16, 1917',
+                    casualties: '300,000+',
+                    participants: ['GBR', 'FRA', 'GER'],
+                    wiki: 'https://en.wikipedia.org/wiki/Battle_of_Arras_(1917)'
+                },
+                'spring_offensive': {
+                    name: 'German Spring Offensive',
+                    coordinates: [49.8667, 3.0333],
+                    date: 'Mar – Jul 1918',
+                    casualties: '700,000+',
+                    participants: ['GER', 'GBR', 'FRA', 'USA'],
+                    wiki: 'https://en.wikipedia.org/wiki/Spring_Offensive'
+                },
+                'meuse_argonne': {
+                    name: 'Meuse-Argonne Offensive',
+                    coordinates: [49.2375, 5.2264],
+                    date: 'Sep 26 – Nov 11, 1918',
+                    casualties: '350,000+',
+                    participants: ['USA', 'FRA', 'GER'],
+                    wiki: 'https://en.wikipedia.org/wiki/Meuse%E2%80%93Argonne_offensive'
+                },
+                'hundred_days': {
+                    name: 'Hundred Days Offensive',
+                    coordinates: [49.7631, 3.0735],
+                    date: 'Aug 8 – Nov 11, 1918',
+                    casualties: '1,000,000+',
+                    participants: ['FRA', 'GBR', 'USA', 'GER'],
+                    wiki: 'https://en.wikipedia.org/wiki/Hundred_Days_Offensive'
+                }
+            },
+            'poland': {
+                'tannenberg': {
+                    name: 'Battle of Tannenberg',
+                    coordinates: [53.4188, 20.1128],
+                    date: 'Aug 26–30, 1914',
+                    casualties: '70,000+',
+                    participants: ['GER', 'RUS'],
+                    wiki: 'https://en.wikipedia.org/wiki/Battle_of_Tannenberg'
+                },
+                'lodz': {
+                    name: 'Battle of Łódź',
+                    coordinates: [51.7592, 19.4560],
+                    date: 'Nov 11 – Dec 6, 1914',
+                    casualties: '200,000+',
+                    participants: ['RUS', 'GER', 'AUS'],
+                    wiki: 'https://en.wikipedia.org/wiki/Battle_of_%C5%81%C3%B3d%C5%BA_(1914)'
+                },
+                'limanowa': {
+                    name: 'Battle of Limanowa',
+                    coordinates: [49.7000, 20.4200],
+                    date: 'Dec 1–13, 1914',
+                    casualties: '30,000+',
+                    participants: ['AUS', 'RUS'],
+                    wiki: 'https://en.wikipedia.org/wiki/Battle_of_Limanowa'
+                },
+                'przemysl': {
+                    name: 'Siege of Przemyśl',
+                    coordinates: [49.7833, 22.7667],
+                    date: 'Sep 16, 1914 – Mar 22, 1915',
+                    casualties: '400,000+',
+                    participants: ['AUS', 'RUS'],
+                    wiki: 'https://en.wikipedia.org/wiki/Siege_of_Przemy%C5%9Bl'
+                },
+                'gorlice_tarnow': {
+                    name: 'Battle of Gorlice–Tarnów',
+                    coordinates: [49.6667, 21.1653],
+                    date: 'May 2 – Jun 22, 1915',
+                    casualties: '400,000+',
+                    participants: ['GER', 'AUS', 'RUS'],
+                    wiki: 'https://en.wikipedia.org/wiki/Gorlice%E2%80%93Tarn%C3%B3w_Offensive'
+                }
+            },
+            'turkey': {
+                'gallipoli': {
+                    name: 'Gallipoli Campaign',
+                    coordinates: [40.3675, 26.4500],
+                    date: 'Apr 25, 1915 – Jan 9, 1916',
+                    casualties: '500,000+',
+                    participants: ['OTT', 'GBR', 'FRA', 'AUS', 'NZL'],
+                    wiki: 'https://en.wikipedia.org/wiki/Gallipoli_campaign'
+                },
+                'sarikamish': {
+                    name: 'Battle of Sarikamish',
+                    coordinates: [40.3253, 42.5889],
+                    date: 'Dec 22, 1914 – Jan 17, 1915',
+                    casualties: '130,000+',
+                    participants: ['RUS', 'OTT'],
+                    wiki: 'https://en.wikipedia.org/wiki/Battle_of_Sarikamish'
+                }
+            },
+            'romania': {
+                'marasti': {
+                    name: 'Battle of Mărăști',
+                    coordinates: [45.6797, 26.9309],
+                    date: 'Jul 22 – Aug 1, 1917',
+                    casualties: '35,000+',
+                    participants: ['ROM', 'RUS', 'AUS'],
+                    wiki: 'https://en.wikipedia.org/wiki/Battle_of_M%C4%83r%C4%83%C8%99ti'
+                },
+                'marasesti': {
+                    name: 'Battle of Mărășești',
+                    coordinates: [45.8833, 27.2000],
+                    date: 'Aug 6 – Sep 3, 1917',
+                    casualties: '60,000+',
+                    participants: ['ROM', 'RUS', 'GER', 'AUS'],
+                    wiki: 'https://en.wikipedia.org/wiki/Battle_of_M%C4%83r%C4%83%C8%99e%C8%99ti'
+                }
+            },
+            'italy': {
+                'vittorio_veneto': {
+                    name: 'Battle of Vittorio Veneto',
+                    coordinates: [45.9867, 12.3007],
+                    date: 'Oct 24 – Nov 4, 1918',
+                    casualties: '300,000+',
+                    participants: ['ITA', 'AUS'],
+                    wiki: 'https://en.wikipedia.org/wiki/Battle_of_Vittorio_Veneto'
+                }
+            },
+            'slovenia': {
+                'caporetto': {
+                    name: 'Battle of Caporetto',
+                    coordinates: [46.2469, 13.5847],
+                    date: 'Oct 24 – Nov 19, 1917',
+                    casualties: '400,000+',
+                    participants: ['AUS', 'GER', 'ITA'],
+                    wiki: 'https://en.wikipedia.org/wiki/Battle_of_Caporetto'
+                }
+            },
+            'belarus': {
+                'lake_naroch': {
+                    name: 'Battle of Lake Naroch',
+                    coordinates: [55.4167, 26.6500],
+                    date: 'Mar 18–30, 1916',
+                    casualties: '110,000+',
+                    participants: ['RUS', 'GER'],
+                    wiki: 'https://en.wikipedia.org/wiki/Lake_Naroch_Offensive'
+                },
+                'faustschlag': {
+                    name: 'Operation Faustschlag',
+                    coordinates: [53.9007, 27.5599],
+                    date: 'Feb 18 – Mar 3, 1918',
+                    casualties: '50,000+',
+                    participants: ['GER', 'AUS', 'RUS'],
+                    wiki: 'https://en.wikipedia.org/wiki/Operation_Faustschlag'
+                }
+            },
+            'macedonia': {
+                'doiran': {
+                    name: 'Battle of Doiran (1917)',
+                    coordinates: [41.1889, 22.7347],
+                    date: 'Apr 22 – May 9, 1917',
+                    casualties: '25,000+',
+                    participants: ['BGR', 'GBR', 'FRA'],
+                    wiki: 'https://en.wikipedia.org/wiki/Battle_of_Doiran_(1917)'
+                }
+            },
+            'denmark': {
+                'jutland': {
+                    name: 'Battle of Jutland',
+                    coordinates: [57.0000, 6.0000],
+                    date: 'May 31 – Jun 1, 1916',
+                    casualties: '10,000+',
+                    participants: ['GBR', 'GER'],
+                    wiki: 'https://en.wikipedia.org/wiki/Battle_of_Jutland'
+                }
+            },
+            'bosnia': {
+                'drina': {
+                    name: 'Battle of the Drina',
+                    coordinates: [44.3833, 19.1167],
+                    date: 'Sep 6 – Oct 4, 1914',
+                    casualties: '100,000+',
+                    participants: ['SRB', 'AUS']
+                }
+            },
+            'ukraine': {
+                'galicia': {
+                    name: 'Battle of Galicia',
+                    coordinates: [49.4500, 22.0500],
+                    date: 'Aug–Sep 1914',
+                    casualties: '900,000+',
+                    participants: ['AUS', 'RUS'],
+                    wiki: 'https://en.wikipedia.org/wiki/Battle_of_Galicia'
+                },
+                'kerensky': {
+                    name: 'Kerensky Offensive',
+                    coordinates: [49.6524, 26.9893],
+                    date: 'Jul 1–19, 1917',
+                    casualties: '400,000+',
+                    participants: ['RUS', 'AUS', 'GER'],
+                    wiki: 'https://en.wikipedia.org/wiki/Kerensky_Offensive'
+                },
+                'brusilov': {
+                    name: 'Brusilov Offensive',
+                    coordinates: [50.7472, 25.3254],
+                    date: 'Jun – Sep 1916',
+                    casualties: '2,000,000+',
+                    participants: ['RUS', 'AUS', 'GER'],
+                    wiki: 'https://en.wikipedia.org/wiki/Brusilov_Offensive'
+                }
+            },
+            'israel': {
+                'megiddo': {
+                    name: 'Battle of Megiddo',
+                    coordinates: [32.5833, 35.1833],
+                    date: 'Sep 19–25, 1918',
+                    casualties: '70,000+',
+                    participants: ['OTT', 'GBR', 'FRA'],
+                    wiki: 'https://en.wikipedia.org/wiki/Battle_of_Megiddo_(1918)'
+                },
+                'beersheba': {
+                    name: 'Battle of Beersheba',
+                    coordinates: [31.2520, 34.7915],
+                    date: 'Oct 31, 1917',
+                    casualties: '1,500+',
+                    participants: ['OTT', 'GBR', 'AUS', 'NZL'],
+                    wiki: 'https://en.wikipedia.org/wiki/Battle_of_Beersheba_(1917)'
+                }
+            },
+            'china': {
+                'tsingtao': {
+                    name: 'Siege of Tsingtao',
+                    coordinates: [36.0671, 120.3826],
+                    date: 'Aug 27 – Nov 7, 1914',
+                    casualties: '3,000+',
+                    participants: ['GER', 'JPN', 'GBR'],
+                    wiki: 'https://en.wikipedia.org/wiki/Siege_of_Tsingtao'
+                }
+            },
+            'iraq': {
+                'kut': {
+                    name: 'Siege of Kut',
+                    coordinates: [32.5000, 45.8167],
+                    date: 'Dec 7, 1915 – Apr 29, 1916',
+                    casualties: '30,000+',
+                    participants: ['OTT', 'GBR']
+                }
+            },
+            'egypt': {
+                'romani': {
+                    name: 'Battle of Romani',
+                    coordinates: [31.0747, 33.8306],
+                    date: 'Aug 3–5, 1916',
+                    casualties: '9,000+',
+                    participants: ['OTT', 'GBR'],
+                    wiki: 'https://en.wikipedia.org/wiki/Battle_of_Romani'
+                }
+            },
+            'tanzania': {
+                'tanga': {
+                    name: 'Battle of Tanga',
+                    coordinates: [-5.0667, 39.1000],
+                    date: 'Nov 2–5, 1914',
+                    casualties: '1,000+',
+                    participants: ['GER', 'GBR'],
+                    wiki: 'https://en.wikipedia.org/wiki/Battle_of_Tanga'
+                },
+                'tabora': {
+                    name: 'Battle of Tabora',
+                    coordinates: [-5.0667, 32.8333],
+                    date: 'Aug – Sep 1916',
+                    casualties: '2,000+',
+                    participants: ['GER', 'GBR', 'BEL'],
+                    wiki: 'https://en.wikipedia.org/wiki/Battle_of_Tabora'
+                }
+            },
+            'papua_new_guinea': {
+                'bita_paka': {
+                    name: 'Battle of Bita Paka',
+                    coordinates: [-4.0955, 152.1425],
+                    date: 'Sep 11, 1914',
+                    casualties: '50+',
+                    participants: ['GER', 'AUS'],
+                    wiki: 'https://en.wikipedia.org/wiki/Battle_of_Bita_Paka'
+                },
+                'toma': {
+                    name: 'Battle of Toma',
+                    coordinates: [-4.3492, 152.2710],
+                    date: 'Sep 14–17, 1914',
+                    casualties: 'Minimal',
+                    participants: ['GER', 'AUS'],
+                    wiki: 'https://en.wikipedia.org/wiki/Battle_of_Toma'
+                }
+            },
+            'samoa': {
+                'german_samoa': {
+                    name: 'Capture of German Samoa',
+                    coordinates: [-13.8333, -171.7500],
+                    date: 'Aug 29–30, 1914',
+                    casualties: 'Minimal',
+                    participants: ['GER', 'NZL'],
+                    wiki: 'https://en.wikipedia.org/wiki/Occupation_of_German_Samoa'
+                }
+            },
+            'micronesia': {
+                'caroline_islands': {
+                    name: 'Occupation of the Caroline Islands',
+                    coordinates: [7.4445, 151.8470],
+                    date: 'Sep 29, 1914',
+                    casualties: 'Minimal',
+                    participants: ['GER', 'JPN'],
+                    wiki: 'https://en.wikipedia.org/wiki/Occupation_of_German_New_Guinea#Other_German_islands'
+                }
+            },
+            'chile': {
+                'coronel': {
+                    name: 'Battle of Coronel',
+                    coordinates: [-37.0000, -73.0000],
+                    date: 'Nov 1, 1914',
+                    casualties: '1,600+',
+                    participants: ['GER', 'GBR'],
+                    wiki: 'https://en.wikipedia.org/wiki/Battle_of_Coronel'
+                }
+            },
+            'falkland_islands': {
+                'falklands': {
+                    name: 'Battle of the Falkland Islands',
+                    coordinates: [-52.0000, -59.0000],
+                    date: 'Dec 8, 1914',
+                    casualties: '2,000+',
+                    participants: ['GER', 'GBR'],
+                    wiki: 'https://en.wikipedia.org/wiki/Battle_of_the_Falkland_Islands'
+                }
+            },
+            'germany': {
+                'tannenberg_lakes': {
+                    name: 'Battle of the Masurian Lakes',
+                    coordinates: [54.0000, 22.0000],
+                    date: 'Sep 7-14, 1914',
+                    casualties: '125,000+',
+                    participants: ['GER', 'RUS']
+                },
+                'jutland_coast': {
+                    name: 'Battle of Jutland',
+                    coordinates: [56.7500, 5.8833],
+                    date: 'May 31 – Jun 1, 1916',
+                    casualties: '9,500+',
+                    participants: ['GER', 'GBR']
+                }
+            },
+            'russia': {
+                'tannenberg': {
+                    name: 'Battle of Tannenberg',
+                    coordinates: [53.4188, 20.1128],
+                    date: 'Aug 26-30, 1914',
+                    casualties: '170,000+',
+                    participants: ['GER', 'RUS']
+                },
+                'masurian_lakes': {
+                    name: 'First Battle of the Masurian Lakes',
+                    coordinates: [54.0000, 22.0000],
+                    date: 'Sep 7-14, 1914',
+                    casualties: '125,000+',
+                    participants: ['GER', 'RUS']
+                },
+                'warsaw': {
+                    name: 'Battle of Warsaw',
+                    coordinates: [52.2297, 21.0122],
+                    date: 'Jul 13 – Aug 25, 1920',
+                    casualties: '250,000+',
+                    participants: ['RUS', 'POL']
+                }
+            }
+        };
+
+
+        // Define country flags
+        const countryFlags = {
+            'GBR': '🇬🇧',
+            'GER': '🇩🇪',
+            'FRA': '🇫🇷',
+            'RUS': '🇷🇺',
+            'AUS': '🇦🇹',
+            'ITA': '🇮🇹',
+            'USA': '🇺🇸',
+            'BEL': '🇧🇪',
+            'SRB': '🇷🇸',
+            'OTT': '🇹🇷',
+            'BGR': '🇧🇬',
+            'ROM': '🇷🇴',
+            'NZL': '🇳🇿',
+            'JPN': '🇯🇵'
+        };
+
+        // Now add the animation code AFTER your battles data
+        const map = L.map('map', {
+            zoomAnimation: true,
+            fadeAnimation: true
+        }).setView([50.0, 10.0], 4);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            maxZoom: 18,
+            opacity: 0.8
+        }).addTo(map);
+
+        const mapContainer = document.querySelector('.leaflet-tile-pane');
+        mapContainer.style.filter = 'sepia(0.5) contrast(0.8)';
+
+        // Custom target marker icon
+        const explosionIcon = L.divIcon({
+            html: `<div style="
+                    width: 60px;
+                    height: 60px;
+                    position: relative;
+                ">
+                    <img src="./images/red-cross.png" 
+                         style="width: 100%; height: 100%; 
+                                filter: drop-shadow(0 2px 2px rgba(0,0,0,0.3));"
+                    >
+                </div>`,
+            className: 'explosion-icon',
+            iconSize: [60, 60],
+            iconAnchor: [30, 30]
+        });
+
+        // Get the input element
+        const countryInput = document.getElementById('country-input');
+        const countryDropdown = document.getElementById('country-dropdown');
+
+        // Get array of available countries from our battles data
+        const allCountries = [
+            'Afghanistan', 'Albania', 'Algeria', 'Andorra', 'Angola', 'Argentina', 'Armenia', 'Australia', 'Austria',
+            'Azerbaijan', 'Bahamas', 'Bahrain', 'Bangladesh', 'Belarus', 'Belgium', 'Belize', 'Benin', 'Bhutan',
+            'Bolivia', 'Bosnia', 'Botswana', 'Brazil', 'Brunei', 'Bulgaria', 'Burkina Faso', 'Burundi', 'Cambodia',
+            'Cameroon', 'Canada', 'Chad', 'Chile', 'China', 'Colombia', 'Congo', 'Costa Rica', 'Croatia', 'Cuba',
+            'Cyprus', 'Czech Republic', 'Denmark', 'Djibouti', 'Dominican Republic', 'Ecuador', 'Egypt', 'El Salvador',
+            'Estonia', 'Ethiopia', 'Fiji', 'Finland', 'France', 'Gabon', 'Georgia', 'Germany', 'Ghana', 'Greece',
+            'Guatemala', 'Guinea', 'Guyana', 'Haiti', 'Honduras', 'Hungary', 'Iceland', 'India', 'Indonesia', 'Iran',
+            'Iraq', 'Ireland', 'Israel', 'Italy', 'Jamaica', 'Japan', 'Jordan', 'Kazakhstan', 'Kenya', 'Kuwait',
+            'Kyrgyzstan', 'Laos', 'Latvia', 'Lebanon', 'Lesotho', 'Liberia', 'Libya', 'Liechtenstein', 'Lithuania',
+            'Luxembourg', 'Macedonia', 'Madagascar', 'Malawi', 'Malaysia', 'Maldives', 'Mali', 'Malta', 'Mauritania',
+            'Mauritius', 'Mexico', 'Moldova', 'Monaco', 'Mongolia', 'Montenegro', 'Morocco', 'Mozambique', 'Myanmar',
+            'Namibia', 'Nepal', 'Netherlands', 'New Zealand', 'Nicaragua', 'Niger', 'Nigeria', 'North Korea', 'Norway',
+            'Oman', 'Pakistan', 'Panama', 'Papua New Guinea', 'Paraguay', 'Peru', 'Philippines', 'Poland', 'Portugal',
+            'Qatar', 'Romania', 'Russia', 'Rwanda', 'Samoa', 'San Marino', 'Saudi Arabia', 'Senegal', 'Serbia',
+            'Seychelles', 'Sierra Leone', 'Singapore', 'Slovakia', 'Slovenia', 'Somalia', 'South Africa', 'South Korea',
+            'South Sudan', 'Spain', 'Sri Lanka', 'Sudan', 'Suriname', 'Swaziland', 'Sweden', 'Switzerland', 'Syria',
+            'Taiwan', 'Tajikistan', 'Tanzania', 'Thailand', 'Togo', 'Tonga', 'Trinidad and Tobago', 'Tunisia', 'Turkey',
+            'Turkmenistan', 'Uganda', 'Ukraine', 'United Arab Emirates', 'United Kingdom', 'United States', 'Uruguay',
+            'Uzbekistan', 'Vatican City', 'Venezuela', 'Vietnam', 'Yemen', 'Zambia', 'Zimbabwe'
+        ];
+
+        // Show dropdown with matching countries
+        countryInput.addEventListener('input', function() {
+            const inputValue = this.value.toLowerCase();
+            const matchingCountries = allCountries.filter(country =>
+                country.toLowerCase().includes(inputValue)
+            );
+
+            if (inputValue && matchingCountries.length > 0) {
+                countryDropdown.innerHTML = matchingCountries
+                    .map(country => `<div class="dropdown-item">${country}</div>`)
+                    .join('');
+                countryDropdown.style.display = 'block';
+            } else {
+                countryDropdown.style.display = 'none';
+            }
+        });
+
+        // Handle dropdown item selection
+        countryDropdown.addEventListener('click', function(e) {
+            if (e.target.classList.contains('dropdown-item')) {
+                countryInput.value = e.target.textContent;
+                countryDropdown.style.display = 'none';
+                searchCountry(countryInput.value);
+            }
+        });
+
+        // Hide dropdown when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.autocomplete-container')) {
+                countryDropdown.style.display = 'none';
+            }
+        });
+
+        // Main search function
+        function searchCountry(countryName) {
+            const inputCountry = countryName.toLowerCase().replace(/ /g, '_');
+            
+            // Clear existing markers with fade-out
+            map.eachLayer((layer) => {
+                if (layer instanceof L.Marker) {
+                    const el = layer.getElement();
+                    if (el) {
+                        el.style.transition = 'opacity 0.5s';
+                        el.style.opacity = '0';
+                    }
+                    setTimeout(() => map.removeLayer(layer), 500);
+                }
+            });
+
+            if (battles[inputCountry]) {
+                const countryBattles = battles[inputCountry];
+                let firstBattle = true;
+                let delay = 0;
+                
+                for (let battleId in countryBattles) {
+                    const battle = countryBattles[battleId];
+                    
+                    setTimeout(() => {
+                        const marker = L.marker(battle.coordinates, {
+                            icon: explosionIcon,
+                            opacity: 0
+                        }).addTo(map);
+                        
+                        const el = marker.getElement();
+                        if (el) {
+                            el.style.transition = 'opacity 0.5s';
+                            setTimeout(() => {
+                                el.style.opacity = '1';
+                            }, 50);
+                        }
+
+                        marker.bindPopup(`
+                            <div class="battle-popup">
+                                <h3>${battle.name}</h3>
+                                <p>📅 Date: ${battle.date}</p>
+                                <p>⚔️ Casualties: ${battle.casualties}</p>
+                                <p>Participants: ${battle.participants.map(p => countryFlags[p]).join(' ')}</p>
+                                ${battle.wiki ? `<p><a href="${battle.wiki}" target="_blank">📚 Learn more on Wikipedia</a></p>` : ''}
+                            </div>
+                        `, {
+                            className: 'battle-popup'
+                        });
+
+                        if (firstBattle) {
+                            map.flyTo(battle.coordinates, 7, {
+                                duration: 2,
+                                easeLinearity: 0.25
+                            });
+                            firstBattle = false;
+                        }
+                    }, delay);
+                    
+                    delay += 200;  // Stagger marker appearances
+                }
+            } else {
+                const coordinates = getCountryCoordinates(inputCountry);
+                const nearest = findNearestBattle(coordinates);
+                const direction = getCompassDirection(coordinates, nearest.coordinates);
+                
+                map.flyTo(coordinates, 6, {
+                    duration: 2,
+                    easeLinearity: 0.25
+                });
+                
+                setTimeout(() => {
+                    L.popup()
+                        .setLatLng(coordinates)
+                        .setContent(`
+                            <div class="battle-popup">
+                                <h3>No WWI Battles Found</h3>
+                                <p>There were no major WWI battles fought in ${countryName}.</p>
+                                <p>The nearest battle was ${nearest.distance} miles to the ${direction}.</p>
+                                <p>Try another country!</p>
+                            </div>
+                        `)
+                        .openOn(map);
+                }, 1000);
+            }
+        }
+
+        // Handle enter key
+        countryInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                searchCountry(this.value);
+            }
+        });
+
+        // Add CSS for transitions
+        const style = document.createElement('style');
+        style.textContent += `
+            .leaflet-marker-icon {
+                transition: transform 0.3s ease-out, opacity 0.5s ease-out !important;
+            }
+
+            .leaflet-popup {
+                transition: opacity 0.3s ease-out !important;
+            }
+        `;
+        document.head.appendChild(style);
+
+        // Add this new function near the top of the script section
+        function getCountryCoordinates(countryName) {
+            const coordinates = {
+                'afghanistan': [33.9391, 67.7100],
+                'albania': [41.1533, 20.1683],
+                'algeria': [28.0339, 1.6596],
+                'angola': [-11.2027, 17.8739],
+                'argentina': [-38.4161, -63.6167],
+                'armenia': [40.0691, 45.0382],
+                'australia': [-25.2744, 133.7751],
+                'austria': [47.5162, 14.5501],
+                'azerbaijan': [40.1431, 47.5769],
+                'bahamas': [25.0343, -77.3963],
+                'bahrain': [26.0667, 50.5577],
+                'bangladesh': [23.6850, 90.3563],
+                'belarus': [53.7098, 27.9534],
+                'belgium': [50.8503, 4.3517],
+                'belize': [17.1899, -88.4976],
+                'benin': [9.3077, 2.3158],
+                'bhutan': [27.5142, 90.4336],
+                'bolivia': [-16.2902, -63.5887],
+                'bosnia': [43.9159, 17.6791],
+                'botswana': [-22.3285, 24.6849],
+                'brazil': [-14.2350, -51.9253],
+                'brunei': [4.5353, 114.7277],
+                'bulgaria': [42.7339, 25.4858],
+                'burkina_faso': [12.2383, -1.5616],
+                'burundi': [-3.3731, 29.9189],
+                'cambodia': [12.5657, 104.9910],
+                'cameroon': [7.3697, 12.3547],
+                'canada': [56.1304, -106.3468],
+                'chad': [15.4542, 18.7322],
+                'chile': [-35.6751, -71.5430],
+                'china': [35.8617, 104.1954],
+                'colombia': [4.5709, -74.2973],
+                'congo': [-0.2280, 15.8277],
+                'costa_rica': [9.7489, -83.7534],
+                'croatia': [45.1000, 15.2000],
+                'cuba': [21.5218, -77.7812],
+                'cyprus': [35.1264, 33.4299],
+                'czech_republic': [49.8175, 15.4730],
+                'denmark': [56.2639, 9.5018],
+                'djibouti': [11.8251, 42.5903],
+                'dominican_republic': [18.7357, -70.1627],
+                'ecuador': [-1.8312, -78.1834],
+                'egypt': [26.8206, 30.8025],
+                'el_salvador': [13.7942, -88.8965],
+                'estonia': [58.5953, 25.0136],
+                'ethiopia': [9.1450, 40.4897],
+                'fiji': [-17.7134, 178.0650],
+                'finland': [61.9241, 25.7482],
+                'france': [46.2276, 2.2137],
+                'gabon': [-0.8037, 11.6094],
+                'georgia': [42.3154, 43.3569],
+                'germany': [51.1657, 10.4515],
+                'ghana': [7.9465, -1.0232],
+                'greece': [39.0742, 21.8243],
+                'guatemala': [15.7835, -90.2308],
+                'guinea': [9.9456, -9.6966],
+                'guyana': [4.8604, -58.9302],
+                'haiti': [18.9712, -72.2852],
+                'honduras': [15.2000, -86.2419],
+                'hungary': [47.1625, 19.5033],
+                'iceland': [64.9631, -19.0208],
+                'india': [20.5937, 78.9629],
+                'indonesia': [-0.7893, 113.9213],
+                'iran': [32.4279, 53.6880],
+                'iraq': [33.2232, 43.6793],
+                'ireland': [53.1424, -7.6921],
+                'israel': [31.0461, 34.8516],
+                'italy': [41.8719, 12.5674],
+                'jamaica': [18.1096, -77.2975],
+                'japan': [36.2048, 138.2529],
+                'jordan': [30.5852, 36.2384],
+                'kazakhstan': [48.0196, 66.9237],
+                'kenya': [-0.0236, 37.9062],
+                'kuwait': [29.3117, 47.4818],
+                'kyrgyzstan': [41.2044, 74.7661],
+                'laos': [19.8563, 102.4955],
+                'latvia': [56.8796, 24.6032],
+                'lebanon': [33.8547, 35.8623],
+                'lesotho': [-29.6099, 28.2336],
+                'liberia': [6.4281, -9.4295],
+                'libya': [26.3351, 17.2283],
+                'liechtenstein': [47.1660, 9.5554],
+                'lithuania': [55.1694, 23.8813],
+                'luxembourg': [49.8153, 6.1296],
+                'macedonia': [41.6086, 21.7453],
+                'madagascar': [-18.7669, 46.8691],
+                'malawi': [-13.2543, 34.3015],
+                'malaysia': [4.2105, 101.9758],
+                'maldives': [3.2028, 73.2207],
+                'mali': [17.5707, -3.9962],
+                'malta': [35.9375, 14.3754],
+                'mauritania': [21.0079, -10.9408],
+                'mauritius': [-20.3484, 57.5522],
+                'mexico': [23.6345, -102.5528],
+                'micronesia': [7.4256, 150.5508],
+                'moldova': [47.4116, 28.3699],
+                'monaco': [43.7384, 7.4246],
+                'mongolia': [46.8625, 103.8467],
+                'montenegro': [42.7087, 19.3744],
+                'morocco': [31.7917, -7.0926],
+                'mozambique': [-18.6657, 35.5296],
+                'myanmar': [21.9162, 95.9560],
+                'namibia': [-22.9576, 18.4904],
+                'nepal': [28.3949, 84.1240],
+                'netherlands': [52.1326, 5.2913],
+                'new_zealand': [-40.9006, 174.8860],
+                'nicaragua': [12.8654, -85.2072],
+                'niger': [17.6078, 8.0817],
+                'nigeria': [9.0820, 8.6753],
+                'north_korea': [40.3399, 127.5101],
+                'norway': [60.4720, 8.4689],
+                'oman': [21.4735, 55.9754],
+                'pakistan': [30.3753, 69.3451],
+                'panama': [8.5380, -80.7821],
+                'papua_new_guinea': [-6.3149, 143.9555],
+                'paraguay': [-23.4425, -58.4438],
+                'peru': [-9.1900, -75.0152],
+                'philippines': [12.8797, 121.7740],
+                'poland': [51.9194, 19.1451],
+                'portugal': [39.3999, -8.2245],
+                'qatar': [25.3548, 51.1839],
+                'romania': [45.9432, 24.9668],
+                'russia': [61.5240, 105.3188],
+                'rwanda': [-1.9403, 29.8739],
+                'samoa': [-13.7590, -172.1046],
+                'san_marino': [43.9424, 12.4578],
+                'saudi_arabia': [23.8859, 45.0792],
+                'senegal': [14.4974, -14.4524],
+                'serbia': [44.0165, 21.0059],
+                'seychelles': [-4.6796, 55.4920],
+                'sierra_leone': [8.4606, -11.7799],
+                'singapore': [1.3521, 103.8198],
+                'slovakia': [48.6690, 19.6990],
+                'slovenia': [46.1512, 14.9955],
+                'somalia': [5.1521, 46.1996],
+                'south_africa': [-30.5595, 22.9375],
+                'south_korea': [35.9078, 127.7669],
+                'south_sudan': [6.8770, 31.3070],
+                'spain': [40.4637, -3.7492],
+                'sri_lanka': [7.8731, 80.7718],
+                'sudan': [12.8628, 30.2176],
+                'suriname': [3.9193, -56.0278],
+                'swaziland': [-26.5225, 31.4659],
+                'sweden': [60.1282, 18.6435],
+                'switzerland': [46.8182, 8.2275],
+                'syria': [34.8021, 38.9968],
+                'taiwan': [23.5937, 120.9447],
+                'tajikistan': [38.8610, 71.2761],
+                'tanzania': [-6.3690, 34.8888],
+                'thailand': [15.8700, 100.9925],
+                'togo': [8.6195, 0.8248],
+                'tonga': [-21.1789, -175.1982],
+                'trinidad_and_tobago': [10.6918, -61.2225],
+                'tunisia': [33.8869, 9.5375],
+                'turkey': [38.9637, 35.2433],
+                'turkmenistan': [38.9697, 59.5563],
+                'uganda': [1.3733, 32.2903],
+                'ukraine': [48.3794, 31.1656],
+                'united_arab_emirates': [23.4241, 53.8478],
+                'united_kingdom': [55.3781, -3.4360],
+                'united_states': [37.0902, -95.7129],
+                'uruguay': [-32.5228, -55.7658],
+                'uzbekistan': [41.3775, 64.5853],
+                'vatican_city': [41.9029, 12.4534],
+                'venezuela': [6.4238, -66.5897],
+                'vietnam': [14.0583, 108.2772],
+                'yemen': [15.5527, 48.5164],
+                'zambia': [-13.1339, 27.8493],
+                'zimbabwe': [-19.0154, 29.1549],
+                'central_african_republic': [6.6111, 20.9394]
+            };
+            
+            const formattedName = countryName.toLowerCase().replace(/ /g, '_');
+            return coordinates[formattedName] || [0, 0];
+        }
+
+        // Add these helper functions before the event listener
+        function calculateDistance(coord1, coord2) {
+            // Haversine formula to calculate distance between two points on a sphere
+            const R = 6371; // Earth's radius in km
+            const lat1 = coord1[0] * Math.PI / 180;
+            const lat2 = coord2[0] * Math.PI / 180;
+            const deltaLat = (coord2[0] - coord1[0]) * Math.PI / 180;
+            const deltaLon = (coord2[1] - coord1[1]) * Math.PI / 180;
+
+            const a = Math.sin(deltaLat/2) * Math.sin(deltaLat/2) +
+                    Math.cos(lat1) * Math.cos(lat2) *
+                    Math.sin(deltaLon/2) * Math.sin(deltaLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            const km = Math.round(R * c);
+            return Math.round(km * 0.621371); // Convert km to miles and round
+        }
+
+        function getCompassDirection(coord1, coord2) {
+            const lat1 = coord1[0] * Math.PI / 180;
+            const lat2 = coord2[0] * Math.PI / 180;
+            const deltaLon = (coord2[1] - coord1[1]) * Math.PI / 180;
+
+            const y = Math.sin(deltaLon) * Math.cos(lat2);
+            const x = Math.cos(lat1) * Math.sin(lat2) -
+                    Math.sin(lat1) * Math.cos(lat2) * Math.cos(deltaLon);
+            const bearing = Math.atan2(y, x) * 180 / Math.PI;
+
+            // Convert bearing to 8-point compass direction with full words
+            const directions = ['North', 'Northeast', 'East', 'Southeast', 'South', 'Southwest', 'West', 'Northwest'];
+            const index = Math.round(((bearing + 360) % 360) / 45) % 8;
+            return directions[index];
+        }
+
+        function findNearestBattle(coordinates) {
+            let nearestBattle = null;
+            let shortestDistance = Infinity;
+
+            // Iterate through all battles in all countries
+            for (const country in battles) {
+                for (const battle in battles[country]) {
+                    const battleCoords = battles[country][battle].coordinates;
+                    const distance = calculateDistance(coordinates, battleCoords);
+                    
+                    if (distance < shortestDistance) {
+                        shortestDistance = distance;
+                        nearestBattle = {
+                            name: battles[country][battle].name,
+                            coordinates: battleCoords,
+                            distance: distance
+                        };
+                    }
+                }
+            }
+
+            return nearestBattle;
+        }
+    </script>
+</body>
+</html> 
